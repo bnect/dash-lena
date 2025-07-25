@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Reservas Leña</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f8fafc;
+            color: #334155;
+            padding: 20px;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '🔥';
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            font-size: 48px;
+            opacity: 0.2;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 16px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 30px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .control-group label {
+            font-weight: 600;
+            color: #475569;
+        }
+
+        input[type="date"], select {
+            padding: 8px 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            background: white;
+            color: #475569;
+            font-size: 14px;
+        }
+
+        .loading {
+            display: none;
+            color: #dc2626;
+            font-weight: 600;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .metric-card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            border-left: 5px solid;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .metric-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px -5px rgba(0, 0, 0, 0.15);
+        }
+
+        .metric-card.confirmadas {
+            border-left-color: #dc2626;
+        }
+
+        .metric-card.clientes {
+            border-left-color: #ea580c;
+        }
+
+        .metric-card.pessoas {
+            border-left-color: #f59e0b;
+        }
+
+        .metric-card.periodo {
+            border-left-color: #84cc16;
+        }
+
+        .metric-number {
+            font-size: 36px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            line-height: 1;
+        }
+
+        .metric-card.confirmadas .metric-number { color: #dc2626; }
+        .metric-card.clientes .metric-number { color: #ea580c; }
+        .metric-card.pessoas .metric-number { color: #f59e0b; }
+        .metric-card.periodo .metric-number { color: #84cc16; }
+
+        .metric-label {
+            color: #64748b;
+            font-size: 14px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .metric-sublabel {
+            color: #94a3b8;
+            font-size: 12px;
+            margin-top: 4px;
+        }
+
+        .charts-container {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .chart-card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .chart-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #1e293b;
+        }
+
+        .chart-subtitle {
+            color: #64748b;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+
+        .summary-stats {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 0;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        .stat-item:last-child {
+            border-bottom: none;
+        }
+
+        .stat-label {
+            color: #64748b;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .stat-value {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .stat-trend {
+            font-size: 12px;
+            color: #64748b;
+            margin-top: 2px;
+        }
+
+        .legend {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+        }
+
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+        }
+
+        .icon {
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            color: white;
+        }
+
+        .icon.confirmadas { background: #dc2626; }
+        .icon.clientes { background: #ea580c; }
+        .icon.pessoas { background: #f59e0b; }
+        .icon.periodo { background: #84cc16; }
+
+        .details-section {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            margin-top: 20px;
+        }
+
+        .details-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: #1e293b;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .detail-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+        }
+
+        .detail-item {
+            padding: 16px;
+            background: #f8fafc;
+            border-radius: 8px;
+            border-left: 3px solid #dc2626;
+        }
+
+        .detail-label {
+            font-size: 12px;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+
+        .detail-value {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1e293b;
+        }
+
+        .error {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #dc2626;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        @media (max-width: 768px) {
+            .charts-container {
+                grid-template-columns: 1fr;
+            }
+            
+            .controls {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .detail-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🔥 Dashboard de Reservas Leña</h1>
+        <p>Sistema de gestão e análise de reservas do restaurante</p>
+    </div>
+
+    <div class="error" id="errorMessage"></div>
+
+    <div class="controls">
+        <div class="control-group">
+            <label>Data Início:</label>
+            <input type="date" id="startDate">
+        </div>
+        <div class="control-group">
+            <label>Data Fim:</label>
+            <input type="date" id="endDate">
+        </div>
+        <button onclick="updateDashboard()" style="padding: 8px 16px; background: #dc2626; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600;">
+            Atualizar Dashboard
+        </button>
+        <div class="loading" id="loading">🔄 Carregando...</div>
+    </div>
+
+    <div class="metrics-grid">
+        <div class="metric-card confirmadas">
+            <div class="metric-number" id="reservasConfirmadas">0</div>
+            <div class="metric-label">Reservas Confirmadas</div>
+            <div class="metric-sublabel" id="reservasSubtitle">carregando...</div>
+        </div>
+        
+        <div class="metric-card clientes">
+            <div class="metric-number" id="clientesUnicos">0</div>
+            <div class="metric-label">Clientes Únicos</div>
+            <div class="metric-sublabel" id="clientesSubtitle">carregando...</div>
+        </div>
+        
+        <div class="metric-card pessoas">
+            <div class="metric-number" id="totalPessoas">0</div>
+            <div class="metric-label">Total de Pessoas</div>
+            <div class="metric-sublabel" id="pessoasSubtitle">carregando...</div>
+        </div>
+        
+        <div class="metric-card periodo">
+            <div class="metric-number" id="taxaSucesso">0%</div>
+            <div class="metric-label">Taxa de Sucesso</div>
+            <div class="metric-sublabel" id="sucessoSubtitle">comparecimento</div>
+        </div>
+    </div>
+
+    <div class="charts-container">
+        <div class="chart-card">
+            <div class="chart-title">Distribuição de Reservas por Data</div>
+            <div class="chart-subtitle">Volume de reservas ao longo do período</div>
+            
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #dc2626;"></div>
+                    <span>Reservas Confirmadas</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #ea580c;"></div>
+                    <span>Pessoas por Dia</span>
+                </div>
+            </div>
+            
+            <div class="chart-container">
+                <canvas id="reservasChart"></canvas>
+            </div>
+        </div>
+
+        <div class="summary-stats">
+            <div class="chart-title">Resumo Executivo</div>
+            
+            <div class="stat-item">
+                <div class="stat-label">
+                    <div class="icon confirmadas">📋</div>
+                    Total Pedidos Delivery
+                </div>
+                <div>
+                    <div class="stat-value" id="totalDelivery">0</div>
+                    <div class="stat-trend">pedidos entrega</div>
+                </div>
+            </div>
+            
+            <div class="stat-item">
+                <div class="stat-label">
+                    <div class="icon pessoas">💰</div>
+                    Ticket Médio
+                </div>
+                <div>
+                    <div class="stat-value" id="ticketMedio">R$ 0</div>
+                    <div class="stat-trend">valor médio</div>
+                </div>
+            </div>
+            
+            <div class="stat-item">
+                <div class="stat-label">
+                    <div class="icon clientes">🤖</div>
+                    Escalonamentos IA
+                </div>
+                <div>
+                    <div class="stat-value" id="escalonamentos">0</div>
+                    <div class="stat-trend">para humano</div>
+                </div>
+            </div>
+            
+            <div class="stat-item">
+                <div class="stat-label">
+                    <div class="icon periodo">👥</div>
+                    Novos Clientes
+                </div>
+                <div>
+                    <div class="stat-value" id="novosClientes">0%</div>
+                    <div class="stat-trend">% do período</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="details-section">
+        <div class="details-title">
+            📊 Detalhamento por Características
+        </div>
+        <div class="detail-grid">
+            <div class="detail-item">
+                <div class="detail-label">Maior Reserva</div>
+                <div class="detail-value" id="maiorReserva">0 pessoas</div>
+            </div>
+            <div class="detail-item">
+                <div class="detail-label">Média por Reserva</div>
+                <div class="detail-value" id="mediaPorReserva">0 pessoas</div>
+            </div>
+            <div class="detail-item">
+                <div class="detail-label">Retorno em 30 Dias</div>
+                <div class="detail-value" id="retorno30Dias">0%</div>
+            </div>
+            <div class="detail-item">
+                <div class="detail-label">Horário Preferido</div>
+                <div class="detail-value" id="horarioPreferido">-</div>
+            </div>
+            <div class="detail-item">
+                <div class="detail-label">Tipo Atendimento</div>
+                <div class="detail-value" id="tipoAtendimento">-</div>
+            </div>
+            <div class="detail-item">
+                <div class="detail-label">Dias no Período</div>
+                <div class="detail-value" id="diasPeriodo">0 dias</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuração da API do Supabase
+        const SUPABASE_URL = 'SUA_URL_SUPABASE_AQUI'; // Substitua pela sua URL
+        const SUPABASE_ANON_KEY = 'SUA_CHAVE_ANONIMA_AQUI'; // Substitua pela sua chave
+
+        // Variáveis globais
+        let dashboardChart = null;
+        let dashboardData = {
+            leads: [],
+            reservas: [],
+            pedidos: [],
+            analises: []
+        };
+
+        // Função para fazer requisições à API do Supabase
+        async function supabaseQuery(table, filters = '') {
+            try {
+                const url = `${SUPABASE_URL}/rest/v1/${table}?${filters}`;
+                const response = await fetch(url, {
+                    headers: {
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Erro na requisição: ${response.status}`);
+                }
+
+                return await response.json();
+            } catch (error) {
+                console.error(`Erro ao consultar ${table}:`, error);
+                showError(`Erro ao carregar dados de ${table}: ${error.message}`);
+                return [];
+            }
+        }
+
+        // Função para exibir erros
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+
+        // Função para esconder erros
+        function hideError() {
+            document.getElementById('errorMessage').style.display = 'none';
+        }
+
+        // Função para buscar todos os dados
+        async function fetchData(startDate, endDate) {
+            document.getElementById('loading').style.display = 'inline';
+            hideError();
+
+            try {
+                // Formatar datas para ISO
+                const startISO = new Date(startDate).toISOString();
+                const endISO = new Date(endDate + 'T23:59:59').toISOString();
+
+                // Buscar dados em paralelo
+                const [leads, reservas, pedidos, analises] = await Promise.all([
+                    supabaseQuery('leads'),
+                    supabaseQuery('reservas', `data_reserva=gte.${startISO}&data_reserva=lte.${endISO}`),
+                    supabaseQuery('pedidos'),
+                    supabaseQuery('analise_diaria_lena')
+                ]);
+
+                dashboardData = { leads, reservas, pedidos, analises };
+                return dashboardData;
+            } catch (error) {
+                showError('Erro ao carregar dados do dashboard');
+                console.error('Erro geral:', error);
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+
+        // Função para calcular KPIs
+        function calculateKPIs(data, startDate, endDate) {
+            const { leads, reservas, pedidos, analises } = data;
+
+            // 1. Reservas Confirmadas
+            const reservasConfirmadas = reservas.filter(r => r.status === 'Confirmada').length;
+
+            // 2. Clientes Únicos
+            const clientesUnicos = new Set(reservas.map(r => r.lead)).size;
+
+            // 3. Total de Pessoas
+            const totalPessoas = reservas.reduce((sum, r) => sum + (r.numero_pessoas || 0), 0);
+
+            // 4. Taxa de Sucesso (Comparecimento)
+            const totalReservas = reservas.length;
+            const compareceram = reservas.filter(r => r.compareceu === true).length;
+            const taxaSucesso = totalReservas > 0 ? Math.round((compareceram / totalReservas) * 100) : 0;
+
+            // 5. Total Pedidos Delivery
+            const totalDelivery = pedidos.filter(p => p.tipo === 'Delivery').length;
+
+            // 6. Ticket Médio
+            const pedidosComTotal = pedidos.filter(p => p.total && p.total > 0);
+            const ticketMedio = pedidosComTotal.length > 0 
+                ? pedidosComTotal.reduce((sum, p) => sum + parseFloat(p.total), 0) / pedidosComTotal.length 
+                : 0;
+
+            // 7. Escalonamentos da IA
+            const escalonamentos = analises.filter(a => a.escalonado_para_humano === true).length;
+
+            // 8. % Novos Clientes
+            const clientesPeriodo = new Set(reservas.map(r => r.lead));
+            let novosClientes = 0;
+            
+            clientesPeriodo.forEach(telefone => {
+                const primeiraReserva = leads.find(l => l.telefone === telefone)?.data_primeiro_contato;
+                if (primeiraReserva) {
+                    const dataPrimeira = new Date(primeiraReserva).toDateString();
+                    const dataInicio = new Date(startDate).toDateString();
+                    const dataFim = new Date(endDate).toDateString();
+                    
+                    if (dataPrimeira >= dataInicio && dataPrimeira <= dataFim) {
+                        novosClientes++;
+                    }
+                }
+            });
+
+            const percentualNovos = clientesPeriodo.size > 0 
+                ? Math.round((novosClientes / clientesPeriodo.size) * 100) 
+                : 0;
+
+            // 9. % Retorno em 30 Dias
+            let clientesComRetorno = 0;
+            const reservasOrdenadas = reservas.sort((a, b) => new Date(a.data_reserva) - new Date(b.data_reserva));
+            
+            const clientesAnalisados = new Set();
+            reservasOrdenadas.forEach(reserva => {
+                if (clientesAnalisados.has(reserva.lead)) return;
+                
+                const reservasCliente = reservasOrdenadas.filter(r => r.lead === reserva.lead);
+                if (reservasCliente.length > 1) {
+                    for (let i = 0; i < reservasCliente.length - 1; i++) {
+                        const data1 = new Date(reservasCliente[i].data_reserva);
+                        const data2 = new Date(reservasCliente[i + 1].data_reserva);
+                        const diffDays = (data2 - data1) / (1000 * 60 * 60 * 24);
+                        
+                        if (diffDays <= 30) {
+                            clientesComRetorno++;
+                            break;
+                        }
+                    }
+                }
+                clientesAnalisados.add(reserva.lead);
+            });
+
+            const percentualRetorno = clientesUnicos > 0 
+                ? Math.round((clientesComRetorno / clientesUnicos) * 100) 
+                : 0;
+
+            // Dados adicionais
+            const maiorReserva = reservas.length > 0 ? Math.max(...reservas.map(r => r.numero_pessoas || 0)) : 0;
+            const mediaPorReserva = totalReservas > 0 ? (totalPessoas / totalReservas).toFixed(1) : 0;
+            
+            // Horário preferido
+            const almoco = reservas.filter(r => r.almoço_jantar === 'Almoço').length;
+            const jantar = reservas.filter(r => r.almoço_jantar === 'Jantar').length;
+            const horarioPreferido = almoco > jantar ? 'Almoço' : jantar > almoco ? 'Jantar' : 'Equilibrado';
+
+            // Tipo de atendimento predominante
+            const tiposAtendimento = analises.reduce((acc, a) => {
+                acc[a.tipo_atendimento] = (acc[a.tipo_atendimento] || 0) + 1;
+                return acc;
+            }, {});
+            const tipoAtendimento = Object.keys(tiposAtendimento).reduce((a, b) => 
+                tiposAtendimento[a] > tiposAtendimento[b] ? a : b, 'IA');
+
+            // Dias no período
+            const start = new Date(startDate);
+            const end = new Date(endDate);
+            const diasPeriodo = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+
+            return {
+                reservasConfirmadas,
+                clientesUnicos,
+                totalPessoas,
+                taxaSucesso,
+                totalDelivery,
+                ticketMedio,
+                escalonamentos,
+                percentualNovos,
+                percentualRetorno,
+                maiorReserva,
+                mediaPorReserva,
+                horarioPreferido,
+                tipoAtendimento,
+                diasPeriodo
+            };
+        }
+
+        // Função para preparar dados do gráfico
+        function prepareChartData(reservas, startDate, endDate) {
+            const start = new Date(startDate);
+            const end = new Date(endDate);
+            const days = [];
+            const reservasPorDia = {};
+            const pessoasPorDia = {};
+
+            // Criar array de dias
+            for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+                const dayKey = d.toISOString().split('T')[0];
+                days.push(dayKey);
+                reservasPorDia[dayKey] = 0;
+                pessoasPorDia[dayKey] = 0;
+            }
+
+            // Contar reservas e pessoas por dia
+            reservas.forEach(reserva => {
+                const dataReserva = new Date(reserva.data_reserva).toISOString().split('T')[0];
+                if (reservasPorDia.hasOwnProperty(dataReserva) && reserva.status === 'Confirmada') {
+                    reservasPorDia[dataReserva]++;
+                    pessoasPorDia[dataReserva] += reserva.numero_pessoas || 0;
+                }
+            });
+
+            return {
+                labels: days.map(day => {
+                    const date = new Date(day);
+                    return `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}`;
+                }),
+                reservasData: days.map(day => reservasPorDia[day]),
+                pessoasData: days.map(day => pessoasPorDia[day])
+            };
+        }
+
+        // Função para atualizar a interface
+        function updateDashboardUI(kpis, chartData) {
+            // Atualizar KPIs principais
+            document.getElementById('reservasConfirmadas').textContent = kpis.reservasConfirmadas;
+            document.getElementById('reservasSubtitle').textContent = 'confirmadas no período';
+            
+            document.getElementById('clientesUnicos').textContent = kpis.clientesUnicos;
+            document.getElementById('clientesSubtitle').textContent = 'sem repetições';
+            
+            document.getElementById('totalPessoas').textContent = kpis.totalPessoas;
+            document.getElementById('pessoasSubtitle').textContent = `média: ${kpis.mediaPorReserva}/reserva`;
+            
+            document.getElementById('taxaSucesso').textContent = `${kpis.taxaSucesso}%`;
+
+            // Atualizar resumo executivo
+            document.getElementById('totalDelivery').textContent = kpis.totalDelivery;
+            document.getElementById('ticketMedio').textContent = `R$ ${kpis.ticketMedio.toFixed(2)}`;
+            document.getElementById('escalonamentos').textContent = kpis.escalonamentos;
+            document.getElementById('novosClientes').textContent = `${kpis.percentualNovos}%`;
+
+            // Atualizar detalhamento
+            document.getElementById('maiorReserva').textContent = `${kpis.maiorReserva} pessoas`;
+            document.getElementById('mediaPorReserva').textContent = `${kpis.mediaPorReserva} pessoas`;
+            document.getElementById('retorno30Dias').textContent = `${kpis.percentualRetorno}%`;
+            document.getElementById('horarioPreferido').textContent = kpis.horarioPreferido;
+            document.getElementById('tipoAtendimento').textContent = kpis.tipoAtendimento;
+            document.getElementById('diasPeriodo').textContent = `${kpis.diasPeriodo} dias`;
+
+            // Atualizar gráfico
+            updateChart(chartData);
+        }
+
+        // Função para atualizar o gráfico
+        function updateChart(chartData) {
+            const ctx = document.getElementById('reservasChart').getContext('2d');
+            
+            if (dashboardChart) {
+                dashboardChart.destroy();
+            }
+
+            dashboardChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: chartData.labels,
+                    datasets: [
+                        {
+                            label: 'Reservas',
+                            data: chartData.reservasData,
+                            backgroundColor: 'rgba(220, 38, 38, 0.8)',
+                            borderColor: 'rgba(220, 38, 38, 1)',
+                            borderWidth: 1,
+                            borderRadius: 4,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'Pessoas',
+                            data: chartData.pessoasData,
+                            type: 'line',
+                            borderColor: 'rgba(234, 88, 12, 1)',
+                            backgroundColor: 'rgba(234, 88, 12, 0.1)',
+                            borderWidth: 3,
+                            fill: false,
+                            tension: 0.4,
+                            pointBackgroundColor: 'rgba(234, 88, 12, 1)',
+                            pointBorderColor: '#fff',
+                            pointBorderWidth: 2,
+                            pointRadius: 6,
+                            yAxisID: 'y1'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                            titleColor: '#1e293b',
+                            bodyColor: '#475569',
+                            borderColor: '#e2e8f0',
+                            borderWidth: 1,
+                            cornerRadius: 8
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                display: false
+                            },
+                            border: {
+                                display: false
+                            }
+                        },
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            beginAtZero: true,
+                            grid: {
+                                color: 'rgba(148, 163, 184, 0.1)'
+                            },
+                            border: {
+                                display: false
+                            },
+                            ticks: {
+                                color: '#64748b'
+                            },
+                            title: {
+                                display: true,
+                                text: 'Reservas',
+                                color: '#dc2626'
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            beginAtZero: true,
+                            grid: {
+                                drawOnChartArea: false,
+                            },
+                            ticks: {
+                                color: '#64748b'
+                            },
+                            title: {
+                                display: true,
+                                text: 'Pessoas',
+                                color: '#ea580c'
+                            }
+                        }
+                    },
+                    interaction: {
+                        mode: 'nearest',
+                        axis: 'x',
+                        intersect: false
+                    }
+                }
+            });
+        }
+
+        // Função principal para atualizar o dashboard
+        async function updateDashboard() {
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+
+            if (!startDate || !endDate) {
+                showError('Por favor, selecione as datas de início e fim.');
+                return;
+            }
+
+            if (new Date(startDate) > new Date(endDate)) {
+                showError('A data de início não pode ser posterior à data de fim.');
+                return;
+            }
+
+            // Buscar dados
+            const data = await fetchData(startDate, endDate);
+            if (!data) return;
+
+            // Calcular KPIs
+            const kpis = calculateKPIs(data, startDate, endDate);
+
+            // Preparar dados do gráfico
+            const chartData = prepareChartData(data.reservas, startDate, endDate);
+
+            // Atualizar interface
+            updateDashboardUI(kpis, chartData);
+        }
+
+        // Função para inicializar o app
+        function initializeApp() {
+            // Verificar se as configurações do Supabase estão definidas
+            if (SUPABASE_URL === 'SUA_URL_SUPABASE_AQUI' || SUPABASE_ANON_KEY === 'SUA_CHAVE_ANONIMA_AQUI') {
+                showError('Por favor, configure SUPABASE_URL e SUPABASE_ANON_KEY no código.');
+                return;
+            }
+
+            // Definir datas padrão (últimos 30 dias)
+            const today = new Date();
+            const thirtyDaysAgo = new Date(today.getTime() - (30 * 24 * 60 * 60 * 1000));
+            
+            document.getElementById('endDate').value = today.toISOString().split('T')[0];
+            document.getElementById('startDate').value = thirtyDaysAgo.toISOString().split('T')[0];
+
+            // Carregar dados iniciais
+            updateDashboard();
+        }
+
+        // Inicializar quando a página carregar
+        window.addEventListener('load', initializeApp);
+
+        // Adicionar listeners para mudança de data
+        document.getElementById('startDate').addEventListener('change', updateDashboard);
+        document.getElementById('endDate').addEventListener('change', updateDashboard);
+    </script>
+</body>
+</html>
